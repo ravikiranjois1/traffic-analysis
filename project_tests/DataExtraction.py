@@ -1,5 +1,7 @@
 import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
+import numpy as np
+from pymongo import MongoClient
 
 
 def read_data():
@@ -31,6 +33,7 @@ def read_data():
 
 
 def process_data(traffic_frame, red_light_frame):
+    # For Red Light Violations
     red_light_frame["TYPE"] = red_light_frame["ADDRESS"].str.split().str[-1]
     red_light_address_types = set()
     for item in red_light_frame.TYPE:
@@ -65,6 +68,7 @@ def process_data(traffic_frame, red_light_frame):
             red_light_frame["STREET_NAME"][row] = " ".join(red_light_frame["STREET_NAME"][row])
     # print(red_light_frame)
 
+    # For Traffic Crashes
     traffic_frame["STREET_FIRST_NAME"] = traffic_frame["STREET_NAME"].str.split(' ', -1)
 
     traffic_crash_types = set()
@@ -76,8 +80,12 @@ def process_data(traffic_frame, red_light_frame):
         traffic_crash_types.add(item[-1])
     print(traffic_crash_types)
 
+    traffic_frame.STREET_FIRST_NAME.fillna(0)
+    traffic_frame['STREET_FIRST_NAME'] = traffic_frame['STREET_FIRST_NAME'].replace(np.nan, 0)
+    # print(type(traffic_frame.STREET_FIRST_NAME[3008]))
+
     for row in range(len(traffic_frame["STREET_FIRST_NAME"])):
-        if traffic_frame["STREET_FIRST_NAME"][row].isnull():
+        if traffic_frame["STREET_FIRST_NAME"][row] == 0:
             continue
         if traffic_frame["STREET_FIRST_NAME"][row][-1] == "RD":
             traffic_frame["STREET_FIRST_NAME"][row][-1] = "ROAD"
@@ -99,34 +107,30 @@ def process_data(traffic_frame, red_light_frame):
             traffic_frame["STREET_FIRST_NAME"][row] = " ".join(traffic_frame["STREET_FIRST_NAME"][row])
         else:
             traffic_frame["STREET_FIRST_NAME"][row] = " ".join(traffic_frame["STREET_FIRST_NAME"][row])
-    print(traffic_frame)
-        # if name[-1] == "ROA":
-        #     name[-1] = "ROAD"
-        # name = [" ".join(name)]
-        # print("x")
-    # for name in red_light_frame["STREET_NAME"]:
-    #     x = 1
-    #     if name[-1] == "ROA":
-    #         name[-1] = "ROAD"
-    #     elif name[-1] == "AVEN":
-    #         name[-1] = "AVENUE"
-    #     elif name[-1] == "STREE":
-    #         name[-1] = "STREET"
-    #     elif name[-1] == "BOULEV":
-    #         name[-1] = "BOULEVARD"
-    #     elif name[-1] == "DR":
-    #         name[-1] = "DRIVE"
-    #     # print("x")
-    # for name in red_light_frame["STREET_NAME"]:
-    #     name = [" ".join(name)]
+    # print(traffic_frame)
+    return red_light_frame, traffic_frame
 
 
+def insert_data_to_mongo(traffic_frame):
+    client = MongoClient('localhost', 27017)
+    db = client['traffic_analysis']
+    collection = db['traffic_crash']
 
-    # for item in red_light_frame
-    #     if(red_light_address_types)
+    traffic_frame.reset_index(inplace=True)
+    print("Convert df to dict")
+    traffic_frame_dict = traffic_frame.to_dict("records")
 
+    print("Inserting traffic data to MongoDB")
+    collection.insert_many(traffic_frame_dict)
+
+    print("Insert Red Light Data to traffic collection")
+    # -----------%%%%%%%%-------------
+    # Work to be done here to update the existing data with the red light data using the "DATE" field as the key
 
 
 if __name__ == '__main__':
     red_light_frame, traffic_frame = read_data()
-    process_data(traffic_frame, red_light_frame)
+    red_light_frame, traffic_frame = process_data(traffic_frame, red_light_frame)
+    insert_data_to_mongo(traffic_frame)
+
+
