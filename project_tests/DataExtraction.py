@@ -2,11 +2,13 @@ import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
 import numpy as np
 from pymongo import MongoClient
+from matplotlib import pyplot as plot
 
 
 def read_data():
     traffic_crashes = "/Users/ravikiranjois/Documents/RIT/Semester 3 - Summer '20/Data Cleaning and Preparation/Project/Datasets/Traffic_Crashes.csv"
     red_light_violations = "/Users/ravikiranjois/Documents/RIT/Semester 3 - Summer '20/Data Cleaning and Preparation/Project/Datasets/Red_Light_Camera_Violations.csv"
+    speed_camera = "/Users/ravikiranjois/Documents/RIT/Semester 3 - Summer '20/Data Cleaning and Preparation/Project/Datasets/Speed_Camera_Violations.csv"
 
     red_light_df = pd.read_csv(red_light_violations, usecols=["ADDRESS", "VIOLATION DATE", "VIOLATIONS"])
 
@@ -14,123 +16,112 @@ def read_data():
                            usecols=["CRASH_DATE", "STREET_NO", "STREET_NAME", "STREET_DIRECTION", "POSTED_SPEED_LIMIT",
                                     "FIRST_CRASH_TYPE", "TRAFFICWAY_TYPE", "PRIM_CONTRIBUTORY_CAUSE"])
 
+    speed_df = pd.read_csv(speed_camera, usecols=["ADDRESS", "VIOLATION DATE", "VIOLATIONS"])
+
     red_light_sample = pd.DataFrame(red_light_df.ADDRESS.str.split(' ', 2).tolist(),
+                                    columns=['STREET_NO', 'STREET_DIRECTION', 'STREET_NAME'])
+
+    speed_sample = pd.DataFrame(speed_df.ADDRESS.str.split(' ', 2).tolist(),
                                     columns=['STREET_NO', 'STREET_DIRECTION', 'STREET_NAME'])
 
     crash_df[['Date', 'Time', 'M']] = crash_df.CRASH_DATE.str.split(" ", expand=True, )
 
     red_light_df_sample = red_light_df.head(10000)
     crash_df_sample = crash_df.head(10000)
+    speed_sample = speed_df.head(10000)
 
     red_light_df_sample.to_csv("/Users/ravikiranjois/Documents/RIT/Semester 3 - Summer '20/Data Cleaning and Preparation/Project/Datasets/Red_Light_Camera_Violations_sample.csv",
         sep='\t', encoding='utf-8')
     crash_df_sample.to_csv("/Users/ravikiranjois/Documents/RIT/Semester 3 - Summer '20/Data Cleaning and Preparation/Project/Datasets/Traffic_Crashes_sample.csv",
         sep='\t', encoding='utf-8')
+    speed_sample.to_csv("/Users/ravikiranjois/Documents/RIT/Semester 3 - Summer '20/Data Cleaning and Preparation/Project/Datasets/Speed_Camera_Sample.csv",
+        sep='\t', encoding='utf-8')
 
-    # print(red_light_df_sample)
-    # print(crash_df_sample)
-    return red_light_df_sample, crash_df_sample
+    return red_light_df_sample, crash_df_sample, speed_sample
 
 
-def process_data(traffic_frame, red_light_frame):
+def process_data(traffic_frame, red_light_frame, speed_sample):
+
     # For Red Light Violations
-    red_light_frame["TYPE"] = red_light_frame["ADDRESS"].str.split().str[-1]
-    red_light_address_types = set()
-    for item in red_light_frame.TYPE:
-        red_light_address_types.add(item)
-    print(red_light_address_types)
+    red_light_frame["ADDRESS"].replace(to_replace=[" roa$| ROA$", " ave$| AVE$", " stree$| STREE$",
+                                                   " boulev$| BOULEV$", " dr$| DR$", " parkwa$| PARKWA$"],
+                                       value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY"], regex=True, inplace=True)
 
     red_light_frame["STREET_NO_DIR"] = red_light_frame["ADDRESS"].str.split(' ', 2)
+
+    red_light_frame["STREET_NAME"] = red_light_frame["ADDRESS"].str.split().str[2:]
+    red_light_frame["STREET_NAME"] = [' '.join(map(str, l)) for l in red_light_frame['STREET_NAME']]
+
     for row in range(len(red_light_frame["STREET_NO_DIR"])):
         red_light_frame["STREET_NO_DIR"][row] = red_light_frame["STREET_NO_DIR"][row][:-1]
 
-    red_light_frame["STREET_NAME"] = red_light_frame["ADDRESS"].str.split().str[2:]
-    for row in range(len(red_light_frame["STREET_NAME"])):
-        if red_light_frame["STREET_NAME"][row][-1] == "ROA":
-            red_light_frame["STREET_NAME"][row][-1] = "ROAD"
-            red_light_frame["STREET_NAME"][row] = " ".join(red_light_frame["STREET_NAME"][row])
-        elif red_light_frame["STREET_NAME"][row][-1] == "AVEN":
-            red_light_frame["STREET_NAME"][row][-1] = "AVENUE"
-            red_light_frame["STREET_NAME"][row] = " ".join(red_light_frame["STREET_NAME"][row])
-        elif red_light_frame["STREET_NAME"][row][-1] == "STREE":
-            red_light_frame["STREET_NAME"][row][-1] = "STREET"
-            red_light_frame["STREET_NAME"][row] = " ".join(red_light_frame["STREET_NAME"][row])
-        elif red_light_frame["STREET_NAME"][row][-1] == "BOULEV":
-            red_light_frame["STREET_NAME"][row][-1] = "BOULEVARD"
-            red_light_frame["STREET_NAME"][row] = " ".join(red_light_frame["STREET_NAME"][row])
-        elif red_light_frame["STREET_NAME"][row][-1] == "DR":
-            red_light_frame["STREET_NAME"][row][-1] = "DRIVE"
-            red_light_frame["STREET_NAME"][row] = " ".join(red_light_frame["STREET_NAME"][row])
-        elif red_light_frame["STREET_NAME"][row][-1] == "PARKWA":
-            red_light_frame["STREET_NAME"][row][-1] = "PARKWAY"
-            red_light_frame["STREET_NAME"][row] = " ".join(red_light_frame["STREET_NAME"][row])
-        else:
-            red_light_frame["STREET_NAME"][row] = " ".join(red_light_frame["STREET_NAME"][row])
-    # print(red_light_frame)
+    red_light_frame[['STREET_NO', 'STREET_DIR']] = pd.DataFrame(red_light_frame.STREET_NO_DIR.tolist(), index=red_light_frame.index)
+
 
     # For Traffic Crashes
-    traffic_frame["STREET_FIRST_NAME"] = traffic_frame["STREET_NAME"].str.split(' ', -1)
+    traffic_frame["STREET_NAME"].replace(to_replace=[" rd$| RD$", " ave$| AVE$", " st$| ST$",
+                                                           " blvd$| BLVD$", " dr$| DR$", " pkwy$| PKWY$"],
+                                               value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY"],
+                                               regex=True, inplace=True)
 
-    traffic_crash_types = set()
-    # i=0
-    traffic_name_df = traffic_frame[pd.notnull(traffic_frame["STREET_FIRST_NAME"])]
-    for item in traffic_name_df.STREET_FIRST_NAME:
-        # i+=1
-        # print(i, item, item[-1])
-        traffic_crash_types.add(item[-1])
-    print(traffic_crash_types)
+    traffic_frame['STREET_NAME'].replace(np.nan, -9999, inplace=True)
 
-    traffic_frame.STREET_FIRST_NAME.fillna(0)
-    traffic_frame['STREET_FIRST_NAME'] = traffic_frame['STREET_FIRST_NAME'].replace(np.nan, 0)
-    # print(type(traffic_frame.STREET_FIRST_NAME[3008]))
+    # For Speed Camera Violations
+    speed_sample["ADDRESS"].replace(to_replace=[" rd$| RD$", " av$| AV$| ave$| AVE$", " st$| stree$| STREE$| ST$",
+                                                    " blvd$| BLVD$", " dr$| DR$", " parkwa$| PARKWA$", " hwy$| HWY$"],
+                                        value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY",
+                                               " HIGHWAY"],
+                                        regex=True, inplace=True)
 
-    for row in range(len(traffic_frame["STREET_FIRST_NAME"])):
-        if traffic_frame["STREET_FIRST_NAME"][row] == 0:
-            continue
-        if traffic_frame["STREET_FIRST_NAME"][row][-1] == "RD":
-            traffic_frame["STREET_FIRST_NAME"][row][-1] = "ROAD"
-            traffic_frame["STREET_FIRST_NAME"][row] = " ".join(traffic_frame["STREET_FIRST_NAME"][row])
-        elif traffic_frame["STREET_FIRST_NAME"][row][-1] == "AVE":
-            traffic_frame["STREET_FIRST_NAME"][row][-1] = "AVENUE"
-            traffic_frame["STREET_FIRST_NAME"][row] = " ".join(traffic_frame["STREET_FIRST_NAME"][row])
-        elif traffic_frame["STREET_FIRST_NAME"][row][-1] == "ST":
-            traffic_frame["STREET_FIRST_NAME"][row][-1] = "STREET"
-            traffic_frame["STREET_FIRST_NAME"][row] = " ".join(traffic_frame["STREET_FIRST_NAME"][row])
-        elif traffic_frame["STREET_FIRST_NAME"][row][-1] == "BLVD":
-            traffic_frame["STREET_FIRST_NAME"][row][-1] = "BOULEVARD"
-            traffic_frame["STREET_FIRST_NAME"][row] = " ".join(traffic_frame["STREET_FIRST_NAME"][row])
-        elif traffic_frame["STREET_FIRST_NAME"][row][-1] == "DR":
-            traffic_frame["STREET_FIRST_NAME"][row][-1] = "DRIVE"
-            traffic_frame["STREET_FIRST_NAME"][row] = " ".join(traffic_frame["STREET_FIRST_NAME"][row])
-        elif traffic_frame["STREET_FIRST_NAME"][row][-1] == "PKWY":
-            traffic_frame["STREET_FIRST_NAME"][row][-1] = "PARKWAY"
-            traffic_frame["STREET_FIRST_NAME"][row] = " ".join(traffic_frame["STREET_FIRST_NAME"][row])
-        else:
-            traffic_frame["STREET_FIRST_NAME"][row] = " ".join(traffic_frame["STREET_FIRST_NAME"][row])
-    # print(traffic_frame)
-    return red_light_frame, traffic_frame
+    speed_sample["STREET_NO_DIR"] = speed_sample["ADDRESS"].str.split(' ', 2)
+
+    speed_sample["STREET_NAME"] = speed_sample["ADDRESS"].str.split().str[2:]
+    speed_sample["STREET_NAME"] = [' '.join(map(str, l)) for l in speed_sample['STREET_NAME']]
+
+    for row in range(len(speed_sample["STREET_NO_DIR"])):
+        speed_sample["STREET_NO_DIR"][row] = speed_sample["STREET_NO_DIR"][row][:-1]
+
+    speed_sample[['STREET_NO', 'STREET_DIR']] = pd.DataFrame(speed_sample.STREET_NO_DIR.tolist(),
+                                                                index=speed_sample.index)
+
+    clean_red_light_frame, clean_traffic_frame, clean_speed_frame = select_attributes(red_light_frame, traffic_frame, speed_sample)
+
+    return clean_red_light_frame, clean_traffic_frame, clean_speed_frame
 
 
-def insert_data_to_mongo(traffic_frame):
+def select_attributes(red_light_frame, traffic_frame, speed_frame):
+    traffic_frame.drop(["CRASH_DATE", "Time", "M"], axis=1, inplace=True)
+    red_light_frame.drop(["STREET_NO_DIR", "ADDRESS"], axis=1, inplace=True)
+    speed_frame.drop(["STREET_NO_DIR", "ADDRESS"], axis=1, inplace=True)
+    return red_light_frame, traffic_frame, speed_frame
+
+
+def insert_data_to_mongo(traffic_frame, red_light_frame, speed_frame):
     client = MongoClient('localhost', 27017)
     db = client['traffic_analysis']
-    collection = db['traffic_crash']
+    traffic_crash_collection = db['traffic_crash']
+    violation_collection = db['violation']
+    speed_camera_collection = db['speed']
 
+    traffic_frame["Date"].replace({" ": ""}, inplace=True)
     traffic_frame.reset_index(inplace=True)
-    print("Convert df to dict")
     traffic_frame_dict = traffic_frame.to_dict("records")
 
     print("Inserting traffic data to MongoDB")
-    collection.insert_many(traffic_frame_dict)
+    traffic_crash_collection.insert_many(traffic_frame_dict)
 
     print("Insert Red Light Data to traffic collection")
-    # -----------%%%%%%%%-------------
-    # Work to be done here to update the existing data with the red light data using the "DATE" field as the key
+    red_light_frame["VIOLATION DATE"].replace({" ": ""}, inplace=True)
+    red_light_frame_dict = red_light_frame.to_dict("records")
+    violation_collection.insert_many(red_light_frame_dict)
+
+    print("Insert Speed Camera Data to traffic collection")
+    speed_frame["VIOLATION DATE"].replace({" ": ""}, inplace=True)
+    speed_frame_dict = speed_frame.to_dict("records")
+    speed_camera_collection.insert_many(speed_frame_dict)
 
 
 if __name__ == '__main__':
-    red_light_frame, traffic_frame = read_data()
-    red_light_frame, traffic_frame = process_data(traffic_frame, red_light_frame)
-    insert_data_to_mongo(traffic_frame)
-
-
+    red_light_frame, traffic_frame, speed_frame = read_data()
+    red_light_frame, traffic_frame, speed_frame = process_data(traffic_frame, red_light_frame, speed_frame)
+    insert_data_to_mongo(traffic_frame, red_light_frame, speed_frame)
