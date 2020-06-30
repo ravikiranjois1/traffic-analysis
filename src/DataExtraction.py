@@ -10,10 +10,15 @@ import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn'
 import numpy as np
 from pymongo import MongoClient
-from matplotlib import pyplot as plot
 
 
 def get_mongo_params(file):
+    """
+         This function reads the files and initialise mongoDB configuration
+         for the project
+         :param file: file path of the config file
+         :return filePath dictionary: The dictionary of connection information like port, host and database.
+    """
     with open(file, 'r') as f:
         source = json.loads(f.read())
         return dict(
@@ -24,6 +29,11 @@ def get_mongo_params(file):
 
 
 def get_files_path_params(file):
+    """
+         This function reads file path of three data-sets from the config files
+         :param file: file path of the config file
+         :return filePath dictionary: The dictionary of all the source file paths
+    """
     with open(file, 'r') as f:
         source = json.loads(f.read())
 
@@ -35,6 +45,12 @@ def get_files_path_params(file):
 
 
 def get_mongo_connection(mongo_dict):
+    """
+         This function reads connection dictionary file and establish the
+         connection to mongoDb database
+         :param mongo_dict: The dictionary of all the source file paths
+         :return collection: Mongodb connection string which contains host and port information
+    """
     try:
         connection = MongoClient("mongodb://" + mongo_dict['host'] + ":" + str(mongo_dict['port']))
         print("Connected to MongoDb successfully!")
@@ -44,6 +60,13 @@ def get_mongo_connection(mongo_dict):
 
 
 def read_data():
+    """
+         This function reads the source file, selects the important attribute
+         and convert into the data-set to data frame using pandas library.
+         :return red_light_df: Data-frame obtained from red-light violations
+         :return crash_df: Data-frame obtained from traffic crashes violations
+         :return speed_df: Data-frame obtained from speed-camera violations
+    """
     red_light_df = pd.read_csv(filename_dict["redlight_data_path"], usecols=["ADDRESS", "VIOLATION DATE", "VIOLATIONS"])
 
     crash_df = pd.read_csv(filename_dict["traffic_crash_data_path"],
@@ -58,10 +81,16 @@ def read_data():
 
 
 def process_red_light_data(red_light_frame):
+    """
+         This function reads and process red-light violations data-frame and
+         perform transformations to clean and prepare the red light violations
+         data-set.
+         :param red_light_frame: Red light violations data-frame with selected attributes
+    """
     print("Processing red light violations dataset...")
-    red_light_frame["ADDRESS"].replace(to_replace=[" roa$| ROA$", " ave$| AVE$", " stree$| STREE$",
-                                                   " boulev$| BOULEV$", " dr$| DR$", " parkwa$| PARKWA$"],
-                                       value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY"],
+    red_light_frame["ADDRESS"].replace(to_replace=[" rd$| RD$| roa$| ROA$", " aven$| AVEN$| ave$| AVE$", " st$| ST$| stree$| STREE$",
+                                                   " boulev$| BOULEV$", " dr$| DR$", " parkwa$| PARKWA$", " hw$| HWY$"],
+                                       value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY", "HIGHWAY"],
                                        regex=True, inplace=True)
 
     red_light_frame["STREET_NO_DIR"] = red_light_frame["ADDRESS"].str.split(' ', 2)
@@ -73,6 +102,12 @@ def process_red_light_data(red_light_frame):
 
 
 def process_speed_data(speed_sample):
+    """
+         This function reads and process speed-camera violations data-frame and
+         perform transformations to clean and prepare the speed camera violations
+         data-set.
+         :param speed_sample: Speed-camera violations data-frame with selected attributes
+    """
     print("Processing speed camera violations dataset...")
     speed_sample["ADDRESS"].replace(to_replace=[" rd$| RD$", " av$| AV$| ave$| AVE$", " st$| stree$| STREE$| ST$",
                                                 " blvd$| BLVD$", " dr$| DR$", " parkwa$| PARKWA$", " hwy$| HWY$"],
@@ -90,6 +125,12 @@ def process_speed_data(speed_sample):
 
 
 def process_crash_data(traffic_frame):
+    """
+         This function reads and process traffic crashes data-frame and
+         perform transformations to clean and prepare the traffic crashes
+         data-set.
+         :param traffic_frame: Traffic crashes data-frame with selected attributes
+    """
     print("Processing traffic crashes dataset...")
     traffic_frame["STREET_NAME"].replace(to_replace=[" rd$| RD$", " ave$| AVE$", " st$| ST$",
                                                      " blvd$| BLVD$", " dr$| DR$", " pkwy$| PKWY$"],
@@ -100,7 +141,17 @@ def process_crash_data(traffic_frame):
 
 
 def process_data(traffic_frame, red_light_frame, speed_sample):
-
+    """
+         This function reads and process data frames by passing it to different
+         functions which performs various transformations to clean and prepare
+         the data-sets.
+         :param traffic_frame: Traffic crashes data-frame with selected attributes
+         :param red_light_frame: Red light violations data-frame with selected attributes
+         :param speed_sample: Speed-camera violations data-frame with selected attributes
+         :return clean_red_light_frame: Transformed cleaned data-frame of red light violations
+         :return clean_traffic_frame: Transformed cleaned data-frame of traffic crashes
+         :return clean_speed_frame:  Transformed cleaned data-frame of speed camera violations
+    """
     # For Red Light Violations
     process_red_light_data(red_light_frame)
 
@@ -115,6 +166,15 @@ def process_data(traffic_frame, red_light_frame, speed_sample):
 
 
 def select_attributes(red_light_frame, traffic_frame, speed_frame):
+    """
+         This function drops the irrelevant attributes from the data-frame.
+         :param traffic_frame: Traffic crashes data-frame with selected attributes
+         :param red_light_frame: Red light violations data-frame with selected attributes
+         :param speed_frame: Speed-camera violations data-frame with selected attributes
+         :return red_light_frame: Transformed data-frame of red light violations
+         :return traffic_frame: Transformed  data-frame of traffic crashes
+         :return speed_frame: Transformed data-frame of speed camera violations
+    """
     traffic_frame.drop(["CRASH_DATE", "Time", "M"], axis=1, inplace=True)
     red_light_frame.drop(["STREET_NO_DIR", "ADDRESS"], axis=1, inplace=True)
     speed_frame.drop(["STREET_NO_DIR", "ADDRESS"], axis=1, inplace=True)
@@ -122,6 +182,14 @@ def select_attributes(red_light_frame, traffic_frame, speed_frame):
 
 
 def insert_data_to_mongo(traffic_analysis, mongo_con, traffic_frame, red_light_frame, speed_frame):
+    """
+        This function loads the clean data to mongo db.
+        :param traffic_analysis: Name of the database
+        :param mongo_con: Contains the connection parameters of mongodb
+        :param red_light_frame: Transformed and cleaned data-frame of red-light violations
+        :param traffic_frame: Transformed and cleaned data-frame of traffic-crashes
+        :param speed_frame: Transformed and cleaned data-frame of speed-camera violations
+    """
     db = mongo_con[traffic_analysis]
     traffic_crash_collection = db['traffic_crash']
     violation_collection = db['violation']
@@ -146,6 +214,13 @@ def insert_data_to_mongo(traffic_analysis, mongo_con, traffic_frame, red_light_f
 
 
 def get_stats(red_light_frame, speed_frame, traffic_crash):
+    """
+        This function provides the descrptive statistics for the numeric
+        fields in the dataset
+        :param red_light_frame: Transformed and cleaned data-frame of red-light violations
+        :param traffic_crash: Transformed and cleaned data-frame of traffic-crashes
+        :param speed_frame: Transformed and cleaned data-frame of speed-camera violations
+    """
     red_light_stats = red_light_frame.VIOLATIONS.describe()
     speed_camera_stats = speed_frame.VIOLATIONS.describe()
     traffic_crash = traffic_crash.POSTED_SPEED_LIMIT.describe()
@@ -160,6 +235,11 @@ def get_stats(red_light_frame, speed_frame, traffic_crash):
 
 
 if __name__ == '__main__':
+    """
+        Main function:
+        Print the output,call the functions, prints
+        the overall time taken.
+    """
     start_time = time.time()
 
     config_path = sys.argv[1]

@@ -9,4 +9,4 @@ This program is to clean the data from the 3 datasets.
 - Set database name, hostname and port number in the connection.json file
 - Set the paths for the 3 files in the path.json folder
 - Open the terminal. <br />
-`$ python3 DataExtraction.py`
+`$ python3 DataExtraction.py <path_of_config_folder>`
