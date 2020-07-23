@@ -2,7 +2,7 @@ __author__ = "Abhay Rajendra Dixit "
 __author__ = "Pranjal Pandey"
 __author__ = "Ravikiran Jois Yedur Prabhakar"
 
-
+import datetime
 import json
 import sys
 import time
@@ -196,6 +196,8 @@ def insert_data_to_mongo(traffic_analysis, mongo_con, traffic_frame, red_light_f
     speed_camera_collection = db['speed']
 
     traffic_frame["Date"].replace({" ": ""}, inplace=True)
+    traffic_frame["Date"] = pd.to_datetime(traffic_frame["Date"])
+
     traffic_frame.reset_index(inplace=True)
     traffic_frame_dict = traffic_frame.to_dict("records")
 
@@ -204,11 +206,13 @@ def insert_data_to_mongo(traffic_analysis, mongo_con, traffic_frame, red_light_f
 
     print("Insert Red Light Data to traffic collection")
     red_light_frame["VIOLATION DATE"].replace({" ": ""}, inplace=True)
+    red_light_frame["VIOLATION DATE"] = pd.to_datetime(red_light_frame["VIOLATION DATE"])
     red_light_frame_dict = red_light_frame.to_dict("records")
     violation_collection.insert_many(red_light_frame_dict)
 
     print("Insert Speed Camera Data to traffic collection")
     speed_frame["VIOLATION DATE"].replace({" ": ""}, inplace=True)
+    speed_frame["VIOLATION DATE"] = pd.to_datetime(speed_frame["VIOLATION DATE"])
     speed_frame_dict = speed_frame.to_dict("records")
     speed_camera_collection.insert_many(speed_frame_dict)
 
