@@ -204,17 +204,45 @@ def insert_data_to_mongo(traffic_analysis, mongo_con, traffic_frame, red_light_f
     print("Inserting traffic data to MongoDB")
     traffic_crash_collection.insert_many(traffic_frame_dict)
 
+    print("Truncating documents before 2015")
+    traffic_crash_collection.delete_many(
+        {
+            'Date': {
+                '$lt': datetime.datetime(2015, 1, 1, 0, 0, 0, 0)
+            }
+        }
+    )
+    # traffic_crash_collection.delete_many({"Date": {"$lt": "2015-01-01"}})
+
     print("Insert Red Light Data to traffic collection")
     red_light_frame["VIOLATION DATE"].replace({" ": ""}, inplace=True)
     red_light_frame["VIOLATION DATE"] = pd.to_datetime(red_light_frame["VIOLATION DATE"])
     red_light_frame_dict = red_light_frame.to_dict("records")
     violation_collection.insert_many(red_light_frame_dict)
 
+    violation_collection.delete_many(
+        {
+            'VIOLATION DATE': {
+                '$lt': datetime.datetime(2015, 1, 1, 0, 0, 0, 0)
+            }
+        }
+    )
+    # violation_collection.delete_many({"VIOLATION DATE": {"$lt": "2015-01-01"}})
+
     print("Insert Speed Camera Data to traffic collection")
     speed_frame["VIOLATION DATE"].replace({" ": ""}, inplace=True)
     speed_frame["VIOLATION DATE"] = pd.to_datetime(speed_frame["VIOLATION DATE"])
     speed_frame_dict = speed_frame.to_dict("records")
     speed_camera_collection.insert_many(speed_frame_dict)
+
+    speed_camera_collection.delete_many(
+        {
+            'VIOLATION DATE': {
+                '$lt': datetime.datetime(2015, 1, 1, 0, 0, 0, 0)
+            }
+        }
+    )
+    # speed_camera_collection.delete_many({"VIOLATION DATE": {"$lt": "2015-01-01"}})
 
 
 def get_stats(red_light_frame, speed_frame, traffic_crash):
