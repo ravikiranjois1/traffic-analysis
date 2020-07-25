@@ -69,14 +69,16 @@ def read_data():
          :return crash_df: Data-frame obtained from traffic crashes violations
          :return speed_df: Data-frame obtained from speed-camera violations
     """
-    red_light_df = pd.read_csv(filename_dict["redlight_data_path"], usecols=["ADDRESS", "VIOLATION DATE", "VIOLATIONS"])
+    red_light_df = pd.read_csv(filename_dict["redlight_data_path"], usecols=["ADDRESS", "VIOLATION DATE", "VIOLATIONS",
+                                                                             "LATITUDE", "LONGITUDE"])
 
     crash_df = pd.read_csv(filename_dict["traffic_crash_data_path"],
                            usecols=["CRASH_DATE", "STREET_NO", "STREET_NAME", "STREET_DIRECTION", "POSTED_SPEED_LIMIT",
-                                    "FIRST_CRASH_TYPE", "TRAFFICWAY_TYPE", "PRIM_CONTRIBUTORY_CAUSE"])
+                                    "FIRST_CRASH_TYPE", "TRAFFICWAY_TYPE", "PRIM_CONTRIBUTORY_CAUSE", "LATITUDE",
+                                    "LONGITUDE"])
 
     speed_df = pd.read_csv(filename_dict["speed_violations_data_path"],
-                           usecols=["ADDRESS", "VIOLATION DATE", "VIOLATIONS"])
+                           usecols=["ADDRESS", "VIOLATION DATE", "VIOLATIONS", "LATITUDE", "LONGITUDE"])
 
     crash_df[['Date', 'Time', 'M']] = crash_df.CRASH_DATE.str.split(" ", expand=True, )
 

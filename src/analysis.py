@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 
 pd.options.mode.chained_assignment = None  # default='warn'
 from pymongo import MongoClient
+import numpy as np
 
 
 def get_mongo_params(file):
@@ -155,6 +156,7 @@ def time_series_analysis_combined(traffic_analysis, mongo_conn):
     """
     month_long_to_short = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun", 7: "Jul", 8: "Aug", 9: "Sep",
                            10: "Oct", 11: "Nov", 12: "Dec"}
+    year_long_to_short = {2015: '15', 2016: '16', 2017: '17', 2018: '18', 2019: '19', 2020: '20'}
     db = mongo_conn[traffic_analysis]
 
     """Speed Collection"""
@@ -182,17 +184,22 @@ def time_series_analysis_combined(traffic_analysis, mongo_conn):
 
     speed_df = pd.DataFrame(speed)
     speed_df['Month'] = speed_df['Month'].map(month_long_to_short)
-    speed_df['Year'] = speed_df['Year'].astype(str)
+    speed_df['Year'] = speed_df['Year'].map(year_long_to_short)
+    # speed_df['Year'] = speed_df['Year'].astype(str)
     speed_df['Month'] = speed_df['Month'].astype(str)
-    speed_df['Month_Year'] = speed_df['Month'] + " - " + speed_df['Year']
+    speed_df['Month_Year'] = speed_df['Month'] + ", '" + speed_df['Year']
+    speed_df['Moving Averages'] = speed_df.rolling(window=6).mean()
     ax_speed = speed_df.set_index('Month_Year')['Violations'].plot(kind='line', figsize=(20, 10), color='purple', rot=90,
-                                                                   label="Speed Camera Violations")
-    speed_df.set_index('Month_Year')['Violations'].plot(kind='bar', figsize=(20, 10), color='cadetblue',
-                                                                   rot=90, position=0.1, label="Speed Camera Violations")
+                                                                   label="Speed Camera Violations", grid=True)
+    speed_df.set_index('Month_Year')['Moving Averages'].plot(kind='line', figsize=(20, 10), color='cadetblue',
+                                                                   rot=90, label="Simple Moving Average (Violations)", grid=True)
+    # speed_df.set_index('Month_Year')['Violations'].plot(kind='bar', figsize=(20, 10), color='cadetblue',
+    #                                                                rot=90, position=0.1, label="Speed Camera Violations")
     ax_speed.set_xticks(speed_df.index)
     ax_speed.set_xticklabels(speed_df['Month_Year'], rotation=90)
 
     plt.legend(loc="upper right")
+    plt.title("Speed Camera Violation vs. Month")
     plt.xlabel("Month")
     plt.ylabel("No. of Violations")
     plt.show()
@@ -222,18 +229,21 @@ def time_series_analysis_combined(traffic_analysis, mongo_conn):
 
     red_light_df = pd.DataFrame(red_light_dict)
     red_light_df['Month'] = red_light_df['Month'].map(month_long_to_short)
-    red_light_df['Year'] = red_light_df['Year'].astype(str)
+    red_light_df['Year'] = red_light_df['Year'].map(year_long_to_short)
+    # red_light_df['Year'] = red_light_df['Year'].astype(str)
     red_light_df['Month'] = red_light_df['Month'].astype(str)
-    red_light_df['Month_Year'] = speed_df['Month'] + " - " + speed_df['Year']
-    ax_red_light = red_light_df.set_index('Month_Year')['Violations'].plot(kind='line', figsize=(20, 10), color='black',
-                                                                           rot=90, label="Red Light Violations")
-    red_light_df.set_index('Month_Year')['Violations'].plot(kind='bar', figsize=(20, 10), color='red', rot=90,
-                                                            position=0.1, label="Red Light Violations")
+    red_light_df['Month_Year'] = red_light_df['Month'] + ", '" + red_light_df['Year']
+    red_light_df['Moving Averages'] = red_light_df.rolling(window=6).mean()
+    ax_red_light = red_light_df.set_index('Month_Year')['Violations'].plot(kind='line', figsize=(20, 10), color='red',
+                                                                           rot=90, label="Red Light Violations", grid=True)
+    red_light_df.set_index('Month_Year')['Moving Averages'].plot(kind='line', figsize=(20, 10), color='black', rot=90,
+                                                            label="Simple Moving Average (Violations)", grid=True)
 
     ax_red_light.set_xticks(speed_df.index)
     ax_red_light.set_xticklabels(speed_df['Month_Year'], rotation=90)
 
     plt.legend(loc="upper right")
+    plt.title("Red Light Violation vs. Month")
     plt.xlabel("Month")
     plt.ylabel("No. of Violations")
     plt.show()
@@ -262,13 +272,15 @@ def time_series_analysis_combined(traffic_analysis, mongo_conn):
 
     traffic_crash_df = pd.DataFrame(traffic_dict)
     traffic_crash_df['Month'] = traffic_crash_df['Month'].map(month_long_to_short)
-    traffic_crash_df['Year'] = traffic_crash_df['Year'].astype(str)
+    traffic_crash_df['Year'] = traffic_crash_df['Year'].map(year_long_to_short)
+    # traffic_crash_df['Year'] = traffic_crash_df['Year'].astype(str)
     traffic_crash_df['Month'] = traffic_crash_df['Month'].astype(str)
-    traffic_crash_df['Month_Year'] = speed_df['Month'] + " - " + speed_df['Year']
+    traffic_crash_df['Month_Year'] = traffic_crash_df['Month'] + ", '" + traffic_crash_df['Year']
+    traffic_crash_df['Moving Averages'] = traffic_crash_df.rolling(window=6).mean()
     ax_traffic_crash = traffic_crash_df.set_index('Month_Year')['Violations'].plot(kind='line', figsize=(20, 10), color='green',
-                                                                           rot=90, label="Traffic Crashes")
-    traffic_crash_df.set_index('Month_Year')['Violations'].plot(kind='bar', figsize=(20, 10), color='orange', rot=90,
-                                                            position=0.1, label="Traffic Crashes")
+                                                                           rot=90, label="Traffic Crashes", grid=True)
+    traffic_crash_df.set_index('Month_Year')['Moving Averages'].plot(kind='line', figsize=(20, 10), color='orange', rot=90,
+                                                            label="Simple Moving Average (Violations)", grid=True)
 
     ax_traffic_crash.set_xticks(speed_df.index)
     ax_traffic_crash.set_xticklabels(speed_df['Month_Year'], rotation=90)
