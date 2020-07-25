@@ -76,19 +76,12 @@ def time_series_analysis_combined(traffic_analysis, mongo_con):
             "VIOLATIONS": 1,
             "month": {"$month": "$VIOLATION DATE"}
         }},
-        {
-            '$group': {
+        {'$group': {
                 '_id': "$month",
-                'total': {
-                    "$sum": "$VIOLATIONS"}
+                'total': {"$sum": "$VIOLATIONS"}
             }
         },
-        {
-            '$sort': {
-                '_id': 1,
-
-            }
-        }
+        {'$sort': {'_id': 1}}
     ]))
     print(speed_time)
     months = []
@@ -107,19 +100,12 @@ def time_series_analysis_combined(traffic_analysis, mongo_con):
             "VIOLATIONS": 1,
             "month": {"$month": "$VIOLATION DATE"}
         }},
-        {
-            '$group': {
-                '_id': "$month",
-                'total': {
-                    "$sum": "$VIOLATIONS"}
+        {'$group': {
+            '_id': "$month",
+            'total': {"$sum": "$VIOLATIONS"}
             }
         },
-        {
-            '$sort': {
-                '_id': 1,
-
-            }
-        }
+        {'$sort': {'_id': 1}}
     ]))
     print(violation_coll)
     months = []
@@ -134,16 +120,15 @@ def time_series_analysis_combined(traffic_analysis, mongo_con):
 
     """With Traffic Violations"""
     traffic_crash = list(db.traffic_crash.aggregate([
-        {'$project': {
-            "month": {"$month": "$Date"}
-            }
+        {'$project':
+            {"month": {"$month": "$Date"}}
         },
         {'$group': {
             '_id': "$month",
             'total': {"$sum": 1}
-        }}, {'$sort': {
-            '_id': 1
-        }}
+            }
+        },
+        {'$sort': {'_id': 1}}
     ]))
     print(traffic_crash)
     months = []
