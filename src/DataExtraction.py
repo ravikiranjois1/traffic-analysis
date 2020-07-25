@@ -7,6 +7,8 @@ import json
 import sys
 import time
 import pandas as pd
+import matplotlib.pyplot as plt
+
 pd.options.mode.chained_assignment = None  # default='warn'
 import numpy as np
 from pymongo import MongoClient
@@ -38,9 +40,9 @@ def get_files_path_params(file):
         source = json.loads(f.read())
 
         return dict(
-            traffic_crash_data_path = str(source['traffic_crash_data_path']),
-            redlight_data_path = str(source['redlight_data_path']),
-            speed_violations_data_path = str(source['speed_violations_data_path']),
+            traffic_crash_data_path=str(source['traffic_crash_data_path']),
+            redlight_data_path=str(source['redlight_data_path']),
+            speed_violations_data_path=str(source['speed_violations_data_path']),
         )
 
 
@@ -73,7 +75,8 @@ def read_data():
                            usecols=["CRASH_DATE", "STREET_NO", "STREET_NAME", "STREET_DIRECTION", "POSTED_SPEED_LIMIT",
                                     "FIRST_CRASH_TYPE", "TRAFFICWAY_TYPE", "PRIM_CONTRIBUTORY_CAUSE"])
 
-    speed_df = pd.read_csv(filename_dict["speed_violations_data_path"], usecols=["ADDRESS", "VIOLATION DATE", "VIOLATIONS"])
+    speed_df = pd.read_csv(filename_dict["speed_violations_data_path"],
+                           usecols=["ADDRESS", "VIOLATION DATE", "VIOLATIONS"])
 
     crash_df[['Date', 'Time', 'M']] = crash_df.CRASH_DATE.str.split(" ", expand=True, )
 
@@ -88,10 +91,11 @@ def process_red_light_data(red_light_frame):
          :param red_light_frame: Red light violations data-frame with selected attributes
     """
     print("Processing red light violations dataset...")
-    red_light_frame["ADDRESS"].replace(to_replace=[" rd$| RD$| roa$| ROA$", " aven$| AVEN$| ave$| AVE$", " st$| ST$| stree$| STREE$",
-                                                   " boulev$| BOULEV$", " dr$| DR$", " parkwa$| PARKWA$", " hw$| HWY$"],
-                                       value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY", "HIGHWAY"],
-                                       regex=True, inplace=True)
+    red_light_frame["ADDRESS"].replace(
+        to_replace=[" rd$| RD$| roa$| ROA$", " aven$| AVEN$| ave$| AVE$", " st$| ST$| stree$| STREE$",
+                    " boulev$| BOULEV$", " dr$| DR$", " parkwa$| PARKWA$", " hw$| HWY$"],
+        value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY", "HIGHWAY"],
+        regex=True, inplace=True)
 
     red_light_frame["STREET_NO_DIR"] = red_light_frame["ADDRESS"].str.split(' ', 2)
     red_light_frame["STREET_NAME"] = red_light_frame["ADDRESS"].str.split().str[2:]
@@ -161,7 +165,8 @@ def process_data(traffic_frame, red_light_frame, speed_sample):
     # For Speed Camera Violations
     process_speed_data(speed_sample)
 
-    clean_red_light_frame, clean_traffic_frame, clean_speed_frame = select_attributes(red_light_frame, traffic_frame, speed_sample)
+    clean_red_light_frame, clean_traffic_frame, clean_speed_frame = select_attributes(red_light_frame, traffic_frame,
+                                                                                      speed_sample)
     return clean_red_light_frame, clean_traffic_frame, clean_speed_frame
 
 
@@ -212,7 +217,6 @@ def insert_data_to_mongo(traffic_analysis, mongo_con, traffic_frame, red_light_f
             }
         }
     )
-    # traffic_crash_collection.delete_many({"Date": {"$lt": "2015-01-01"}})
 
     print("Insert Red Light Data to traffic collection")
     red_light_frame["VIOLATION DATE"].replace({" ": ""}, inplace=True)
@@ -227,7 +231,6 @@ def insert_data_to_mongo(traffic_analysis, mongo_con, traffic_frame, red_light_f
             }
         }
     )
-    # violation_collection.delete_many({"VIOLATION DATE": {"$lt": "2015-01-01"}})
 
     print("Insert Speed Camera Data to traffic collection")
     speed_frame["VIOLATION DATE"].replace({" ": ""}, inplace=True)
@@ -242,7 +245,6 @@ def insert_data_to_mongo(traffic_analysis, mongo_con, traffic_frame, red_light_f
             }
         }
     )
-    # speed_camera_collection.delete_many({"VIOLATION DATE": {"$lt": "2015-01-01"}})
 
 
 def get_stats(red_light_frame, speed_frame, traffic_crash):
@@ -285,6 +287,7 @@ if __name__ == '__main__':
     mongo_dict = get_mongo_params(mongo_connection_file)
     db_name, mongo_conn = get_mongo_connection(mongo_dict)
 
+    db = mongo_conn[db_name]
     red_light_frame, traffic_frame, speed_frame = read_data()
     red_light_frame, traffic_frame, speed_frame = process_data(traffic_frame, red_light_frame, speed_frame)
 
@@ -293,5 +296,6 @@ if __name__ == '__main__':
     print("--------------- Data Inserted to MongoDB ----------------")
     print()
     get_stats(red_light_frame, speed_frame, traffic_frame)
+
     print()
-    print("Total time taken for the process: ", time.time()-start_time)
+    print("Total time taken for the process: ", time.time() - start_time)
