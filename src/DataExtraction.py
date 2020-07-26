@@ -93,11 +93,10 @@ def process_red_light_data(red_light_frame):
          :param red_light_frame: Red light violations data-frame with selected attributes
     """
     print("Processing red light violations dataset...")
-    red_light_frame["ADDRESS"].replace(
-        to_replace=[" rd$| RD$| roa$| ROA$", " aven$| AVEN$| ave$| AVE$", " st$| ST$| stree$| STREE$",
-                    " boulev$| BOULEV$", " dr$| DR$", " parkwa$| PARKWA$", " hw$| HWY$"],
-        value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY", "HIGHWAY"],
-        regex=True, inplace=True)
+    red_light_frame["ADDRESS"].replace(to_replace=[" roa$| ROA$", " ave$| AVE$", " stree$| STREE$",
+                                                   " boulev$| BOULEV$", " dr$| DR$", " parkwa$| PARKWA$", " st$| ST$"],
+                                       value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY", " STREET"],
+                                       regex=True, inplace=True)
 
     red_light_frame["STREET_NO_DIR"] = red_light_frame["ADDRESS"].str.split(' ', 2)
     red_light_frame["STREET_NAME"] = red_light_frame["ADDRESS"].str.split().str[2:]
@@ -138,7 +137,7 @@ def process_crash_data(traffic_frame):
          :param traffic_frame: Traffic crashes data-frame with selected attributes
     """
     print("Processing traffic crashes dataset...")
-    traffic_frame["STREET_NAME"].replace(to_replace=[" rd$| RD$", " ave$| AVE$", " st$| ST$",
+    traffic_frame["STREET_NAME"].replace(to_replace=[" rd$| RD$", " ave$| AVE$| av$| AV$", " st$| ST$",
                                                      " blvd$| BLVD$", " dr$| DR$", " pkwy$| PKWY$"],
                                          value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY"],
                                          regex=True, inplace=True)
@@ -300,4 +299,5 @@ if __name__ == '__main__':
     get_stats(red_light_frame, speed_frame, traffic_frame)
 
     print()
+
     print("Total time taken for the process: ", time.time() - start_time)
