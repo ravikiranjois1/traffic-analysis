@@ -60,8 +60,8 @@ def read_data():
 def process_red_light_data(red_light_frame):
     print("Processing red light violations dataset...")
     red_light_frame["ADDRESS"].replace(to_replace=[" roa$| ROA$", " ave$| AVE$", " stree$| STREE$",
-                                                   " boulev$| BOULEV$", " dr$| DR$", " parkwa$| PARKWA$"],
-                                       value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY"],
+                                                   " boulev$| BOULEV$", " dr$| DR$", " parkwa$| PARKWA$", " st$| ST$"],
+                                       value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY", " STREET"],
                                        regex=True, inplace=True)
 
     red_light_frame["STREET_NO_DIR"] = red_light_frame["ADDRESS"].str.split(' ', 2)
@@ -91,7 +91,7 @@ def process_speed_data(speed_sample):
 
 def process_crash_data(traffic_frame):
     print("Processing traffic crashes dataset...")
-    traffic_frame["STREET_NAME"].replace(to_replace=[" rd$| RD$", " ave$| AVE$", " st$| ST$",
+    traffic_frame["STREET_NAME"].replace(to_replace=[" rd$| RD$", " ave$| AVE$| av$| AV$", " st$| ST$",
                                                      " blvd$| BLVD$", " dr$| DR$", " pkwy$| PKWY$"],
                                          value=[" ROAD", " AVENUE", " STREET", " BOULEVARD", " DRIVE", " PARKWAY"],
                                          regex=True, inplace=True)
