@@ -1,3 +1,5 @@
+from matplotlib import lines
+
 __author__ = "Abhay Rajendra Dixit "
 __author__ = "Pranjal Pandey"
 __author__ = "Ravikiran Jois Yedur Prabhakar"
@@ -12,7 +14,10 @@ import copy
 
 pd.options.mode.chained_assignment = None  # default='warn'
 from pymongo import MongoClient
+import matplotlib.lines
+import pingouin as pg
 import numpy as np
+import json
 
 
 def get_mongo_params(file):
@@ -274,7 +279,7 @@ def time_series_analysis_separated(traffic_analysis, mongo_conn):
     traffic_crash_df = pd.DataFrame(traffic_dict)
     traffic_crash_df['Month'] = traffic_crash_df['Month'].map(month_long_to_short)
     traffic_crash_df['Year'] = traffic_crash_df['Year'].map(year_long_to_short)
-    # traffic_crash_df['Year'] = traffic_crash_df['Year'].astype(str)
+
     traffic_crash_df['Month'] = traffic_crash_df['Month'].astype(str)
     traffic_crash_df['Month_Year'] = traffic_crash_df['Month'] + " '" + traffic_crash_df['Year']
     traffic_crash_df['Moving Averages'] = traffic_crash_df.rolling(window=6).mean()
@@ -383,6 +388,83 @@ def time_series_analysis_red_deseasoning(traffic_analysis, mongo_conn):
     plt.show()
 
 
+def visualize(x_df, y_df, x_label, y_label, cor, color):
+    f1 = plt.figure()
+    plt.scatter(x_df, y_df, label="Pearson's Correlation Coefficient = {:.3f}".format(cor.r.pearson), color=color, s=15, marker="o")
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.title(x_label + " v/s " + y_label)
+    plt.legend()
+    plt.draw()
+    return f1
+
+
+def date_perspective(speed_df, red_light_df, traffic_crash_df):
+    date_red_light_frame = red_light_df[['VIOLATION DATE', 'VIOLATIONS']]
+    date_speed_frame = speed_df[['VIOLATION DATE', 'VIOLATIONS']]
+    date_traffic_crash = traffic_crash_df[["Date"]]
+    date_red_light_frame = date_red_light_frame.groupby('VIOLATION DATE', sort=False, as_index=False)[
+        'VIOLATIONS'].sum()
+    date_speed_frame = date_speed_frame.groupby('VIOLATION DATE', sort=False, as_index=False)['VIOLATIONS'].sum()
+    date_traffic_crash['count'] = date_traffic_crash.groupby('Date')['Date'].transform('count')
+    date_traffic_crash.rename(columns={'count': 'Crashes'}, inplace=True)
+    date_speed_frame.rename(columns={'VIOLATION DATE': 'Date', 'VIOLATIONS': 'Red_Light_Violations'}, inplace=True)
+    date_red_light_frame.rename(columns={'VIOLATION DATE': 'Date', 'VIOLATIONS': 'Speed_Limit_Violations'},
+                                inplace=True)
+
+    res = pd.merge(date_traffic_crash, date_speed_frame, how='left', on='Date', sort=True).drop_duplicates()
+    res = pd.merge(res, date_red_light_frame, how='left', on='Date', sort=True).drop_duplicates()
+    res['Total_Violations'] = res['Red_Light_Violations'] + res['Speed_Limit_Violations']
+    res.fillna(0, inplace=True)
+    cor1 = pg.corr(x=res['Red_Light_Violations'], y=res['Crashes'])
+    cor2 = pg.corr(x=res['Speed_Limit_Violations'], y=res['Crashes'])
+    cor3 = pg.corr(x=res['Total_Violations'], y=res['Crashes'])
+
+    f1 = visualize(res["Red_Light_Violations"], res["Crashes"], "Red Light Violations", "Crashes", cor1, 'blue')
+    f2 = visualize(res["Speed_Limit_Violations"], res["Crashes"], "Speed-limit Violations", "Crashes", cor2, 'blue')
+    f3 = visualize(res["Total_Violations"], res["Crashes"], "Total Violations", "Crashes", cor3, 'blue')
+
+    return f1, f2, f3
+
+
+def location_perspective(speed_df, red_light_df, traffic_crash_df):
+    speed_frame_sample = speed_df[['STREET_NAME', 'VIOLATIONS']].groupby('STREET_NAME', as_index=False).sum()
+    red_light_frame_sample = red_light_df[['STREET_NAME', 'VIOLATIONS']].groupby('STREET_NAME', as_index=False).sum()
+    traffic_frame_sample = traffic_crash_df[['STREET_NAME', 'Date']].groupby('STREET_NAME', as_index=False).count()
+
+    red_light_frame_sample.columns = ["STREET_NAME", "REDLIGHT_VIOLATIONS"]
+    speed_frame_sample.columns = ["STREET_NAME", "SPEED_VIOLATIONS"]
+    res = pd.merge(traffic_frame_sample, speed_frame_sample, how='left', on='STREET_NAME')
+    res = pd.merge(res, red_light_frame_sample, how='left', on='STREET_NAME')
+    res.columns = ["STREET_NAME", "REDLIGHT_VIOLATIONS", "SPEED_VIOLATIONS", "Crashes"]
+    res["Total_violations"] = res["REDLIGHT_VIOLATIONS"] + res["SPEED_VIOLATIONS"]
+    res['REDLIGHT_VIOLATIONS'].fillna(0, inplace=True)
+    res['SPEED_VIOLATIONS'].fillna(0, inplace=True)
+    res['Crashes'].fillna(0, inplace=True)
+    res['Total_violations'].fillna(0, inplace=True)
+
+    cor1 = pg.corr(x=res['REDLIGHT_VIOLATIONS'], y=res['Crashes'])
+    cor2 = pg.corr(x=res['SPEED_VIOLATIONS'], y=res['Crashes'])
+    cor3 = pg.corr(x=res['Total_violations'], y=res['Crashes'])
+
+    f1 = visualize(res["REDLIGHT_VIOLATIONS"], res["Crashes"], "Red Light Violations", "Crashes", cor1, 'red')
+    f2 = visualize(res["SPEED_VIOLATIONS"], res["Crashes"], "Speed Camera Violations", "Crashes", cor2, 'orange')
+    f3 = visualize(res["SPEED_VIOLATIONS"], res["Crashes"], "Total Violations", "Crashes", cor3, 'lightblue')
+
+    return f1, f2, f3
+
+
+def correlation():
+    db = mongo_conn["traffic_analysis"]
+    speed_df = pd.DataFrame(list(db.speed.find({})))
+    red_light_df = pd.DataFrame(list(db.violation.find({})))
+    traffic_crash_df = pd.DataFrame(list(db.traffic_crash.find({})))
+
+    date_perspective(speed_df, red_light_df, traffic_crash_df)
+
+    location_perspective(speed_df, red_light_df, traffic_crash_df)
+
+
 if __name__ == '__main__':
     """
         Main function:
@@ -403,6 +485,10 @@ if __name__ == '__main__':
     db_name, mongo_conn = get_mongo_connection(mongo_dict)
 
     db = mongo_conn[db_name]
+
     # time_series_analysis_combined(db_name, mongo_conn)
     time_series_analysis_separated(db_name, mongo_conn)
     time_series_analysis_red_deseasoning(db_name, mongo_conn)
+    correlation()
+
+    plt.show()
