@@ -1,5 +1,3 @@
-from matplotlib import lines
-
 __author__ = "Abhay Rajendra Dixit "
 __author__ = "Pranjal Pandey"
 __author__ = "Ravikiran Jois Yedur Prabhakar"
@@ -11,6 +9,7 @@ import time
 import pandas as pd
 import matplotlib.pyplot as plt
 import copy
+from sklearn.cluster import KMeans
 
 pd.options.mode.chained_assignment = None  # default='warn'
 from pymongo import MongoClient
@@ -483,8 +482,14 @@ def location_perspective(speed_df, red_light_df, traffic_crash_df):
     return f1, f2, f3
 
 
-def correlation():
-    db = mongo_conn["traffic_analysis"]
+def correlation(db_name, mongo_conn):
+    """
+    Method to display correlation between red light violations, speed violations and total violation against crashes with
+    respect to location and date.
+    :return: None
+    """
+
+    db = mongo_conn[db_name]
     speed_df = pd.DataFrame(list(db.speed.find({})))
     red_light_df = pd.DataFrame(list(db.violation.find({})))
     traffic_crash_df = pd.DataFrame(list(db.traffic_crash.find({})))
@@ -492,6 +497,247 @@ def correlation():
     date_perspective(speed_df, red_light_df, traffic_crash_df)
 
     location_perspective(speed_df, red_light_df, traffic_crash_df)
+
+
+def descriptive_stats(db_name, mongo_conn):
+    """
+    Method to print interesting statistics of data based on date and location.
+    :return: None
+    """
+    db = mongo_conn[db_name]
+    speed_df = pd.DataFrame(list(db.speed.find({})))
+    red_light_df = pd.DataFrame(list(db.violation.find({})))
+    traffic_crash_df = pd.DataFrame(list(db.traffic_crash.find({})))
+
+    speed_frame_sample = speed_df[['VIOLATION DATE', 'VIOLATIONS']].groupby('VIOLATION DATE', as_index=False).sum()
+    red_light_frame_sample = red_light_df[['VIOLATION DATE', 'VIOLATIONS']].groupby('VIOLATION DATE', as_index=False).sum()
+    traffic_frame_sample = traffic_crash_df[['Date', 'index']].groupby('Date', as_index=False).count()
+
+    print("Average number of Speed Limit Violations in Chicago per day:", speed_frame_sample['VIOLATIONS'].mean())
+    print("Average number of Red Light Violations in Chicago per day:", red_light_frame_sample['VIOLATIONS'].mean())
+    print("Average number of Traffic Crashes in Chicago per day:", traffic_frame_sample['index'].mean())
+
+
+    speed_frame_sample = speed_df[['STREET_NAME', 'VIOLATIONS']].groupby('STREET_NAME', as_index=False).sum()
+    red_light_frame_sample = red_light_df[['STREET_NAME', 'VIOLATIONS']].groupby('STREET_NAME', as_index=False).sum()
+    traffic_frame_sample = traffic_crash_df[['STREET_NAME', 'Date']].groupby('STREET_NAME', as_index=False).count()
+    traffic_frame_sample.columns = ['STREET_NAME', 'Crashes']
+
+    print()
+    print("Streets with most number of Red Light Violations")
+    print(red_light_frame_sample.sort_values(by=['VIOLATIONS'], ascending=False).head(10))
+
+    print()
+    print("Streets with most number of Speed Limit Violations")
+    print(speed_frame_sample.sort_values(by=['VIOLATIONS'], ascending=False).head(10))
+
+    print()
+    print("Streets with most number of Traffic crashes")
+    print(traffic_frame_sample.sort_values(by=['Crashes'], ascending=False).head(10))
+
+
+def clustering_by_location(speed_df, red_light_df, traffic_crash_df):
+    """
+    Method to implement k-means clustering for data based on location
+    :param speed_df: dataframe consisting of speed violation data
+    :param red_light_df: dataframe consisting of red light violation data
+    :param traffic_crash_df: dataframe consisting of traffic crash data
+    :return: None
+    """
+
+    speed_frame_sample = speed_df[['STREET_NAME', 'VIOLATIONS']].groupby('STREET_NAME', as_index=False).sum()
+    red_light_frame_sample = red_light_df[['STREET_NAME', 'VIOLATIONS']].groupby('STREET_NAME', as_index=False).sum()
+    traffic_frame_sample = traffic_crash_df[['STREET_NAME', 'Date']].groupby('STREET_NAME', as_index=False).count()
+
+    red_light_frame_sample.columns = ["STREET_NAME", "REDLIGHT_VIOLATIONS"]
+    speed_frame_sample.columns = ["STREET_NAME", "SPEED_VIOLATIONS"]
+    res = pd.merge(traffic_frame_sample, speed_frame_sample, how='left', on='STREET_NAME')
+    res = pd.merge(res, red_light_frame_sample, how='left', on='STREET_NAME')
+    res.columns = ["STREET_NAME", "REDLIGHT_VIOLATIONS", "SPEED_VIOLATIONS", "Crashes"]
+    res["Total_violations"] = res["REDLIGHT_VIOLATIONS"] + res["SPEED_VIOLATIONS"]
+    res['REDLIGHT_VIOLATIONS'].fillna(0, inplace=True)
+    res['SPEED_VIOLATIONS'].fillna(0, inplace=True)
+    res['Crashes'].fillna(0, inplace=True)
+    res['Total_violations'].fillna(0, inplace=True)
+
+    red_crash = res[['REDLIGHT_VIOLATIONS', 'Crashes']]
+    speed_crash = res[['SPEED_VIOLATIONS', 'Crashes']]
+
+    kmeans, y_kmeans = k_means(red_crash.to_numpy())
+    k_means_visualization(red_crash.to_numpy(), kmeans, y_kmeans, "Red Light Violations", "Crashes", "Location")
+
+    kmeans, y_kmeans = k_means(speed_crash.to_numpy())
+    k_means_visualization(speed_crash.to_numpy(), kmeans, y_kmeans, "Speed Light Violations", "Crashes", "Location")
+
+
+def clustering_by_date(speed_df, red_light_df, traffic_crash_df):
+    """
+    Method to implement k-means clustering for data based on date
+    :param speed_df: dataframe consisting of speed violation data
+    :param red_light_df: dataframe consisting of red light violation data
+    :param traffic_crash_df: dataframe consisting of traffic crash data
+    :return: None
+    """
+
+    speed_frame_sample = speed_df[['VIOLATION DATE', 'VIOLATIONS']].groupby('VIOLATION DATE', as_index=False).sum()
+    red_light_frame_sample = red_light_df[['VIOLATION DATE', 'VIOLATIONS']].groupby('VIOLATION DATE', as_index=False).sum()
+    traffic_frame_sample = traffic_crash_df[['Date', 'index']].groupby('Date', as_index=False).count()
+
+    traffic_frame_sample.columns = ["VIOLATION DATE", "Crashes"]
+    red_light_frame_sample.columns = ["VIOLATION DATE", "REDLIGHT_VIOLATIONS"]
+    speed_frame_sample.columns = ["VIOLATION DATE", "SPEED_VIOLATIONS"]
+    res = pd.merge(traffic_frame_sample, speed_frame_sample, how='left', on='VIOLATION DATE')
+    res = pd.merge(res, red_light_frame_sample, how='left', on='VIOLATION DATE')
+    res.columns = ["VIOLATION DATE", "REDLIGHT_VIOLATIONS", "SPEED_VIOLATIONS", "Crashes"]
+    res["Total_violations"] = res["REDLIGHT_VIOLATIONS"] + res["SPEED_VIOLATIONS"]
+    res['REDLIGHT_VIOLATIONS'].fillna(0, inplace=True)
+    res['SPEED_VIOLATIONS'].fillna(0, inplace=True)
+    res['Crashes'].fillna(0, inplace=True)
+    res['Total_violations'].fillna(0, inplace=True)
+
+    red_crash = res[['REDLIGHT_VIOLATIONS', 'Crashes']]
+    speed_crash = res[['SPEED_VIOLATIONS', 'Crashes']]
+
+    kmeans, y_kmeans = k_means(red_crash.to_numpy())
+    k_means_visualization(red_crash.to_numpy(), kmeans, y_kmeans, "Red Light Violations", "Crashes", "Date")
+
+    kmeans, y_kmeans = k_means(speed_crash.to_numpy())
+    k_means_visualization(speed_crash.to_numpy(), kmeans, y_kmeans, "Speed Light Violations", "Crashes", "Date")
+
+
+def k_means(norm):
+    """
+    Core method that implements k-means clustering
+    :param norm: dataframe to process
+    :return: returns kmeans object and predicted values
+    """
+    kmeans = KMeans(n_clusters=3)
+    y = kmeans.fit(norm)
+    y_kmeans = kmeans.predict(norm)
+    return kmeans, y_kmeans
+
+
+def k_means_visualization(norm, kmeans, y_kmeans, x_label, y_label, by_attribute):
+    """
+    Method to visualize the results of k-means clustering.
+    :param norm: dataframe to process
+    :param kmeans: kmeans object
+    :param y_kmeans: predictions object
+    :param x_label: label of x-axis
+    :param y_kmeans: label of y-axis
+    :param by_attribute: for title
+    :return: none
+    """
+    f1 = plt.figure()
+    plt.scatter(norm[:, 0], norm[:, 1], c=y_kmeans, s=10, cmap='viridis')
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.title("K-Means by " +  by_attribute)
+    centers = kmeans.cluster_centers_
+    plt.scatter(centers[:, 0], centers[:, 1], c='red', s=50, alpha=0.5)
+    plt.draw()
+
+
+def heat_map(traffic_analysis, mongo_conn):
+    """
+    Code to retrieve data about the number of crashes in the city of Chicago with respect to the location
+    :param traffic_analysis: database name
+    :param mongo_conn: mongoDB connection object
+    :return: None
+    """
+    db = mongo_conn[traffic_analysis]
+    red_light_heat = list(db.violation.aggregate([
+        {'$project': {
+                'LONGITUDE': 1,
+                'LATITUDE': 1,
+                'VIOLATIONS': 1,
+                'STREET_NAME': 1
+        }}]))
+
+    longitude = []
+    latitude = []
+    violations = []
+    street_name = []
+    for item in red_light_heat:
+        longitude.append(item['LONGITUDE'])
+        latitude.append(item['LATITUDE'])
+        violations.append(item['VIOLATIONS'])
+        street_name.append(item['STREET_NAME'])
+
+    red_light_df = {}
+    red_light_df['LONGITUDE'] = longitude
+    red_light_df['LATITUDE'] = latitude
+    red_light_df['VIOLATIONS'] = violations
+    red_light_df['STREET_NAME'] = street_name
+
+    red_light_df = pd.DataFrame(red_light_df)
+    red_light_df.to_csv("red_light_heat.csv", index=False)
+
+    speed_violations = list(db.speed.aggregate([
+        {'$project': {
+            'LONGITUDE': 1,
+            'LATITUDE': 1,
+            'VIOLATIONS': 1,
+            'STREET_NAME': 1
+        }}]))
+
+    longitude = []
+    latitude = []
+    violations = []
+    street_name = []
+    for item in speed_violations:
+        longitude.append(item['LONGITUDE'])
+        latitude.append(item['LATITUDE'])
+        violations.append(item['VIOLATIONS'])
+        street_name.append(item['STREET_NAME'])
+
+    speed_violations_df = {}
+    speed_violations_df['LONGITUDE'] = longitude
+    speed_violations_df['LATITUDE'] = latitude
+    speed_violations_df['VIOLATIONS'] = violations
+    speed_violations_df['STREET_NAME'] = street_name
+
+    speed_violations_df = pd.DataFrame(speed_violations_df)
+    speed_violations_df.to_csv("speed_violations_heat.csv", index=False)
+
+    traffic_crashes = list(db.traffic_crash.aggregate([
+                            {'$group': {'_id': {
+                                        'longitude': '$LONGITUDE',
+                                        'latitude': '$LATITUDE'},
+                                    'violations': {'$sum': 1}}
+                            }, {'$project': {
+                                'longitude': 1,
+                                'latitude': 1,
+                                'violations': 1}}
+                        ]))
+
+    longitude = []
+    latitude = []
+    violations = []
+    # street_name = []
+    for item in traffic_crashes:
+        longitude.append(item['_id']['longitude'])
+        latitude.append(item['_id']['latitude'])
+        violations.append(item['violations'])
+
+    traffic_crashes_df = {}
+    traffic_crashes_df['LONGITUDE'] = longitude
+    traffic_crashes_df['LATITUDE'] = latitude
+    traffic_crashes_df['VIOLATIONS'] = violations
+
+    traffic_crashes_df = pd.DataFrame(traffic_crashes_df)
+    traffic_crashes_df.to_csv("traffic_crashes_heat.csv", index=False)
+
+
+def clustering(db_name, mongo_conn):
+    db = mongo_conn[db_name]
+    speed_df = pd.DataFrame(list(db.speed.find({})))
+    red_light_df = pd.DataFrame(list(db.violation.find({})))
+    traffic_crash_df = pd.DataFrame(list(db.traffic_crash.find({})))
+
+    clustering_by_location(speed_df, red_light_df, traffic_crash_df)
+
+    clustering_by_date(speed_df, red_light_df, traffic_crash_df)
 
 
 if __name__ == '__main__':
@@ -515,9 +761,11 @@ if __name__ == '__main__':
 
     db = mongo_conn[db_name]
 
-    # time_series_analysis_combined(db_name, mongo_conn)
+    time_series_analysis_combined(db_name, mongo_conn)
     time_series_analysis_separated(db_name, mongo_conn)
     time_series_analysis_red_deseasoning(db_name, mongo_conn)
-    correlation()
-
+    heat_map(db_name, mongo_conn)
+    correlation(db_name, mongo_conn)
+    clustering(db_name, mongo_conn)
+    descriptive_stats(db_name, mongo_conn)
     plt.show()
