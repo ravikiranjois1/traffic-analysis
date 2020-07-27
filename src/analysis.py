@@ -389,6 +389,17 @@ def time_series_analysis_red_deseasoning(traffic_analysis, mongo_conn):
 
 
 def visualize(x_df, y_df, x_label, y_label, cor, color):
+    """
+    Method to display graphs depicting correlation between red light violations, speed violations and total violation
+    against crashes with respect to date and location.
+    :param x_df: dataframe as x-axis
+    :param y_df: dataframe as y-axis
+    :param x_label: label for x-axis
+    :param y_label: label for y-axis
+    :param cor: correlation coefficient to be displayed
+    :param color: color of the curve
+    :return: None
+    """
     f1 = plt.figure()
     plt.scatter(x_df, y_df, label="Pearson's Correlation Coefficient = {:.3f}".format(cor.r.pearson), color=color, s=15, marker="o")
     plt.xlabel(x_label)
@@ -400,6 +411,16 @@ def visualize(x_df, y_df, x_label, y_label, cor, color):
 
 
 def date_perspective(speed_df, red_light_df, traffic_crash_df):
+    """
+    Method to calculate and display correlation between redlight violations, speed violations and total violation against crashes with
+    respect to date.
+    :param speed_df: dataframe consisting of speed violation data
+    :param red_light_df: dataframe consisting of red light violation data
+    :param traffic_crash_df: dataframe consisting of traffic crash data
+    :return: None
+    """
+
+
     date_red_light_frame = red_light_df[['VIOLATION DATE', 'VIOLATIONS']]
     date_speed_frame = speed_df[['VIOLATION DATE', 'VIOLATIONS']]
     date_traffic_crash = traffic_crash_df[["Date"]]
@@ -428,6 +449,14 @@ def date_perspective(speed_df, red_light_df, traffic_crash_df):
 
 
 def location_perspective(speed_df, red_light_df, traffic_crash_df):
+    """
+    Method to display correlation between red light violations, speed violations and total violation against crashes with
+    respect to location.
+    :param speed_df: dataframe consisting of speed violation data
+    :param red_light_df: dataframe consisting of red light violation data
+    :param traffic_crash_df: dataframe consisting of traffic crash data
+    :return: None
+    """
     speed_frame_sample = speed_df[['STREET_NAME', 'VIOLATIONS']].groupby('STREET_NAME', as_index=False).sum()
     red_light_frame_sample = red_light_df[['STREET_NAME', 'VIOLATIONS']].groupby('STREET_NAME', as_index=False).sum()
     traffic_frame_sample = traffic_crash_df[['STREET_NAME', 'Date']].groupby('STREET_NAME', as_index=False).count()
