@@ -383,6 +383,100 @@ def time_series_analysis_red_deseasoning(traffic_analysis, mongo_conn):
     plt.show()
 
 
+def heat_map(traffic_analysis, mongo_conn):
+    db = mongo_conn[traffic_analysis]
+    # db.violation.aggregate([
+    #     {'$group': {
+    #         '_id': {
+    #             'year': {'$year': '$VIOLATION DATE'},
+    #             'month': {'$month': '$VIOLATION DATE'}
+    #         },
+    #         'total': {'$sum': '$VIOLATIONS'}}
+    #     }, {'$sort': {'_id': 1}}
+    # ])
+    red_light_heat = list(db.violation.aggregate([
+        {'$project': {
+                'LONGITUDE': 1,
+                'LATITUDE': 1,
+                'VIOLATIONS': 1,
+                'STREET_NAME': 1
+        }}]))
+
+    longitude = []
+    latitude = []
+    violations = []
+    street_name = []
+    for item in red_light_heat:
+        longitude.append(item['LONGITUDE'])
+        latitude.append(item['LATITUDE'])
+        violations.append(item['VIOLATIONS'])
+        street_name.append(item['STREET_NAME'])
+
+    red_light_df = {}
+    red_light_df['LONGITUDE'] = longitude
+    red_light_df['LATITUDE'] = latitude
+    red_light_df['VIOLATIONS'] = violations
+    red_light_df['STREET_NAME'] = street_name
+
+    red_light_df = pd.DataFrame(red_light_df)
+    red_light_df.to_csv("red_light_heat.csv", index=False)
+
+    speed_violations = list(db.speed.aggregate([
+        {'$project': {
+            'LONGITUDE': 1,
+            'LATITUDE': 1,
+            'VIOLATIONS': 1,
+            'STREET_NAME': 1
+        }}]))
+
+    longitude = []
+    latitude = []
+    violations = []
+    street_name = []
+    for item in speed_violations:
+        longitude.append(item['LONGITUDE'])
+        latitude.append(item['LATITUDE'])
+        violations.append(item['VIOLATIONS'])
+        street_name.append(item['STREET_NAME'])
+
+    speed_violations_df = {}
+    speed_violations_df['LONGITUDE'] = longitude
+    speed_violations_df['LATITUDE'] = latitude
+    speed_violations_df['VIOLATIONS'] = violations
+    speed_violations_df['STREET_NAME'] = street_name
+
+    speed_violations_df = pd.DataFrame(speed_violations_df)
+    speed_violations_df.to_csv("speed_violations_heat.csv", index=False)
+
+    traffic_crashes = list(db.traffic_crash.aggregate([
+                            {'$group': {'_id': {
+                                        'longitude': '$LONGITUDE',
+                                        'latitude': '$LATITUDE'},
+                                    'violations': {'$sum': 1}}
+                            }, {'$project': {
+                                'longitude': 1,
+                                'latitude': 1,
+                                'violations': 1}}
+                        ]))
+
+    longitude = []
+    latitude = []
+    violations = []
+    # street_name = []
+    for item in traffic_crashes:
+        longitude.append(item['_id']['longitude'])
+        latitude.append(item['_id']['latitude'])
+        violations.append(item['violations'])
+
+    traffic_crashes_df = {}
+    traffic_crashes_df['LONGITUDE'] = longitude
+    traffic_crashes_df['LATITUDE'] = latitude
+    traffic_crashes_df['VIOLATIONS'] = violations
+
+    traffic_crashes_df = pd.DataFrame(traffic_crashes_df)
+    traffic_crashes_df.to_csv("traffic_crashes_heat.csv", index=False)
+
+
 if __name__ == '__main__':
     """
         Main function:
@@ -403,6 +497,7 @@ if __name__ == '__main__':
     db_name, mongo_conn = get_mongo_connection(mongo_dict)
 
     db = mongo_conn[db_name]
-    # time_series_analysis_combined(db_name, mongo_conn)
+    time_series_analysis_combined(db_name, mongo_conn)
     time_series_analysis_separated(db_name, mongo_conn)
     time_series_analysis_red_deseasoning(db_name, mongo_conn)
+    heat_map(db_name, mongo_conn)
