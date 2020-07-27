@@ -8,6 +8,7 @@ import sys
 import time
 import pandas as pd
 import matplotlib.pyplot as plt
+import copy
 
 pd.options.mode.chained_assignment = None  # default='warn'
 from pymongo import MongoClient
@@ -91,9 +92,9 @@ def time_series_analysis_combined(traffic_analysis, mongo_con):
         months.append(item['_id'])
         violations.append(item['total'])
 
-    plt.plot(months, violations, 'r+-', label='Speed Camera')
+    plt.fill_between(months, violations, color="orange", label='Speed Camera')
     plt.xticks(months)
-    plt.show()
+    # plt.show()
 
     """With Violations"""
     violation_coll = list(db.violation.aggregate([
@@ -115,9 +116,9 @@ def time_series_analysis_combined(traffic_analysis, mongo_con):
         months.append(item['_id'])
         violations.append(item['total'])
 
-    plt.plot(months, violations, 'bo-', label='Red Light')
+    plt.fill_between(months, violations, color='red', label='Red Light')
     plt.xticks(months)
-    plt.show()
+    # plt.show()
 
     """With Traffic Violations"""
     traffic_crash = list(db.traffic_crash.aggregate([
@@ -138,7 +139,7 @@ def time_series_analysis_combined(traffic_analysis, mongo_con):
         months.append(item['_id'])
         violations.append(item['total'])
 
-    plt.plot(months, violations, 'g*-', label='Traffic Crashes')
+    plt.fill_between(months, violations, color="skyblue", label='Traffic Crashes')
     plt.xticks(months)
     plt.legend(loc="upper right")
     plt.xlabel("Month")
@@ -146,7 +147,7 @@ def time_series_analysis_combined(traffic_analysis, mongo_con):
     plt.show()
 
 
-def time_series_analysis_combined(traffic_analysis, mongo_conn):
+def time_series_analysis_separated(traffic_analysis, mongo_conn):
     """
     Method to display the time series data for each collection i.e., Speed Camera Violations, Traffic Camera violations
     and Red Light Violation separately
@@ -187,7 +188,7 @@ def time_series_analysis_combined(traffic_analysis, mongo_conn):
     speed_df['Year'] = speed_df['Year'].map(year_long_to_short)
     # speed_df['Year'] = speed_df['Year'].astype(str)
     speed_df['Month'] = speed_df['Month'].astype(str)
-    speed_df['Month_Year'] = speed_df['Month'] + ", '" + speed_df['Year']
+    speed_df['Month_Year'] = speed_df['Month'] + " '" + speed_df['Year']
     speed_df['Moving Averages'] = speed_df.rolling(window=6).mean()
     ax_speed = speed_df.set_index('Month_Year')['Violations'].plot(kind='line', figsize=(20, 10), color='purple', rot=90,
                                                                    label="Speed Camera Violations", grid=True)
@@ -232,7 +233,7 @@ def time_series_analysis_combined(traffic_analysis, mongo_conn):
     red_light_df['Year'] = red_light_df['Year'].map(year_long_to_short)
     # red_light_df['Year'] = red_light_df['Year'].astype(str)
     red_light_df['Month'] = red_light_df['Month'].astype(str)
-    red_light_df['Month_Year'] = red_light_df['Month'] + ", '" + red_light_df['Year']
+    red_light_df['Month_Year'] = red_light_df['Month'] + " '" + red_light_df['Year']
     red_light_df['Moving Averages'] = red_light_df.rolling(window=6).mean()
     ax_red_light = red_light_df.set_index('Month_Year')['Violations'].plot(kind='line', figsize=(20, 10), color='red',
                                                                            rot=90, label="Red Light Violations", grid=True)
@@ -275,7 +276,7 @@ def time_series_analysis_combined(traffic_analysis, mongo_conn):
     traffic_crash_df['Year'] = traffic_crash_df['Year'].map(year_long_to_short)
     # traffic_crash_df['Year'] = traffic_crash_df['Year'].astype(str)
     traffic_crash_df['Month'] = traffic_crash_df['Month'].astype(str)
-    traffic_crash_df['Month_Year'] = traffic_crash_df['Month'] + ", '" + traffic_crash_df['Year']
+    traffic_crash_df['Month_Year'] = traffic_crash_df['Month'] + " '" + traffic_crash_df['Year']
     traffic_crash_df['Moving Averages'] = traffic_crash_df.rolling(window=6).mean()
     ax_traffic_crash = traffic_crash_df.set_index('Month_Year')['Violations'].plot(kind='line', figsize=(20, 10), color='green',
                                                                            rot=90, label="Traffic Crashes", grid=True)
@@ -286,6 +287,97 @@ def time_series_analysis_combined(traffic_analysis, mongo_conn):
     ax_traffic_crash.set_xticklabels(speed_df['Month_Year'], rotation=90)
 
     plt.legend(loc="upper right")
+    plt.title("Traffic Crashes vs. Month")
+    plt.xlabel("Month")
+    plt.ylabel("No. of Violations")
+    plt.show()
+
+
+def time_series_analysis_red_deseasoning(traffic_analysis, mongo_conn):
+    """
+    Method to display the time series data for Red Light Violation separately
+    :param traffic_analysis: the name of the database on mongoDB
+    :param mongo_conn: mongoDB connection object
+    :return: None
+    """
+    month_long_to_short = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun", 7: "Jul", 8: "Aug", 9: "Sep",
+                           10: "Oct", 11: "Nov", 12: "Dec"}
+    year_long_to_short = {2015: '15', 2016: '16', 2017: '17', 2018: '18', 2019: '19', 2020: '20'}
+    db = mongo_conn[traffic_analysis]
+
+    """Red Light Violations Collection"""
+    red_light = list(db.violation.aggregate([
+        {'$group': {
+            '_id': {
+                'year': {'$year': '$VIOLATION DATE'},
+                'month': {'$month': '$VIOLATION DATE'}
+            },
+            'total': {'$sum': '$VIOLATIONS'}}
+        }, {'$sort': {'_id': 1}}
+    ]))
+
+    months = []
+    years = []
+    violations = []
+    for item in red_light:
+        months.append(item['_id']['month'])
+        years.append(item['_id']['year'])
+        violations.append(item['total'])
+
+    red_light_dict = {}
+    red_light_dict['Month'] = months
+    red_light_dict['Year'] = years
+    red_light_dict['Violations'] = violations
+
+    red_light_df = pd.DataFrame(red_light_dict)
+
+    red_light_seasoner = red_light_df['Violations'].groupby([red_light_df.Year, red_light_df.Month], sort=False).sum().unstack()
+    red_light_seasoner_original = copy.copy(red_light_seasoner)
+    red_light_seasoner_mean_rows = red_light_seasoner.mean(axis=1)
+    for index in range(2015, 2021):
+        for col in red_light_seasoner:
+            red_light_seasoner[col][index] = red_light_seasoner[col][index] / red_light_seasoner_mean_rows[index]
+
+    red_light_seasoner_mean_cols = red_light_seasoner.mean(axis=0)
+    index = 1
+    for col in red_light_seasoner:
+        # for index in range(len(red_light_seasoner)):
+        red_light_seasoner[col] = red_light_seasoner_original[col] / red_light_seasoner_mean_cols[index]
+        index += 1
+
+    red_light_seasoner = red_light_seasoner.unstack().reset_index()
+    red_light_seasoner.rename(columns={0: 'Violations'}, inplace=True)
+    columns_titles = ["Year", "Month", "Violations"]
+    red_light_seasoner = red_light_seasoner.reindex(columns=columns_titles)
+    df_2015 = red_light_seasoner[red_light_seasoner['Year'] == 2015]
+    df_2016 = red_light_seasoner[red_light_seasoner['Year'] == 2016]
+    df_2017 = red_light_seasoner[red_light_seasoner['Year'] == 2017]
+    df_2018 = red_light_seasoner[red_light_seasoner['Year'] == 2018]
+    df_2019 = red_light_seasoner[red_light_seasoner['Year'] == 2019]
+    df_2020 = red_light_seasoner[red_light_seasoner['Year'] == 2020]
+    red_light_seasoner = pd.concat([df_2015, df_2016, df_2017, df_2018, df_2019, df_2020])
+
+    red_light_df['Month'] = red_light_df['Month'].map(month_long_to_short)
+    red_light_df['Year'] = red_light_df['Year'].map(year_long_to_short)
+    # red_light_df['Year'] = red_light_df['Year'].astype(str)
+    red_light_df['Month'] = red_light_df['Month'].astype(str)
+    red_light_df['Month_Year'] = red_light_df['Month'] + " '" + red_light_df['Year']
+    red_light_seasoner['Month'] = red_light_seasoner['Month'].map(month_long_to_short)
+    red_light_seasoner['Year'] = red_light_seasoner['Year'].map(year_long_to_short)
+    # red_light_df['Year'] = red_light_df['Year'].astype(str)
+    red_light_seasoner['Month'] = red_light_seasoner['Month'].astype(str)
+    red_light_seasoner['Month_Year'] = red_light_seasoner['Month'] + " '" + red_light_seasoner['Year']
+
+    ax_red_light = red_light_df.set_index('Month_Year')['Violations'].plot(kind='line', figsize=(20, 10), color='red',
+                                                                rot=90, label="Red Light Violations", grid=True)
+    red_light_seasoner.set_index('Month_Year')['Violations'].plot(kind='line', figsize=(20, 10), color='black',
+                                                                rot=90, label="Deseasoned Violations (Violations)", grid=True)
+
+    ax_red_light.set_xticks(red_light_df.index)
+    ax_red_light.set_xticklabels(red_light_df['Month_Year'], rotation=90)
+
+    plt.legend(loc="upper right")
+    plt.title("Red Light Violation vs. Month")
     plt.xlabel("Month")
     plt.ylabel("No. of Violations")
     plt.show()
@@ -293,10 +385,10 @@ def time_series_analysis_combined(traffic_analysis, mongo_conn):
 
 if __name__ == '__main__':
     """
-            Main function:
-            Print the output,call the functions, prints
-            the overall time taken.
-        """
+        Main function:
+        Print the output,call the functions, prints
+        the overall time taken.
+    """
     start_time = time.time()
 
     config_path = sys.argv[1]
@@ -311,4 +403,6 @@ if __name__ == '__main__':
     db_name, mongo_conn = get_mongo_connection(mongo_dict)
 
     db = mongo_conn[db_name]
-    time_series_analysis_combined(db_name, mongo_conn)
+    # time_series_analysis_combined(db_name, mongo_conn)
+    time_series_analysis_separated(db_name, mongo_conn)
+    time_series_analysis_red_deseasoning(db_name, mongo_conn)
