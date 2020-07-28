@@ -10,3 +10,4 @@ This program is to clean the data from the 3 datasets.
 - Set the paths for the 3 files in the path.json folder
 - Open the terminal. <br />
 `$ python3 DataExtraction.py <path_of_config_folder>`
+`$ python3 analysis.py <path of config folder>`(It should only be ran after the execution of DataExtraction.py)
